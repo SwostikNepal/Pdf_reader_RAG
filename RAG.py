@@ -9,9 +9,21 @@ from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain.chains import create_retrieval_chain
 from langchain.schema import Document
 from langchain.prompts import ChatPromptTemplate
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
 # Initialize FastAPI app
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],  # Allow your React app's URL
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
 
 # Define API key for Cohere
 api_key = os.getenv('API_KEY')
@@ -64,13 +76,18 @@ async def upload_pdf(file: UploadFile = File(...)):
 
 
 # Endpoint to query the uploaded PDF
+class QueryRequest(BaseModel):
+    question: str
+
 @app.post("/query")
-async def query_document(question: str):
+async def query_document(query: QueryRequest):
     global vector, retriever
 
     if not vector or not retriever:
         raise HTTPException(status_code=400, detail="No PDF has been uploaded yet.")
 
+    question = query.question
+    
     # Define the LLM model
     llm = Cohere(cohere_api_key=api_key)
 
