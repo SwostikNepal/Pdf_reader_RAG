@@ -11,19 +11,11 @@ from langchain.schema import Document
 from langchain.prompts import ChatPromptTemplate
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-
+from middleware import add_cors_middleware
 # Initialize FastAPI app
 app = FastAPI()
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # Allow your React app's URL
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-
+add_cors_middleware(app)
 
 # Define API key for Cohere
 api_key = os.getenv('API_KEY')
@@ -74,22 +66,20 @@ async def upload_pdf(file: UploadFile = File(...)):
 
     return {"message": f"PDF '{file.filename}' uploaded and processed successfully."}
 
-
-# Endpoint to query the uploaded PDF
+#Define the structure of the incoming JSON data.
 class QueryRequest(BaseModel):
     question: str
 
+# Endpoint to query the uploaded PDF
 @app.post("/query")
 async def query_document(query: QueryRequest):
     global vector, retriever
 
+    question = query.question
+
     if not vector or not retriever:
         raise HTTPException(status_code=400, detail="No PDF has been uploaded yet.")
-
-    question = query.question
-    
-    # Define the LLM model
-    llm = Cohere(cohere_api_key=api_key)
+   
 
     # Define the prompt template
     template = """"
@@ -117,6 +107,9 @@ Question: {input}
     
     # Create the prompt from the template
     prompt = ChatPromptTemplate.from_template(template)
+
+    # Define the LLM model
+    llm = Cohere(cohere_api_key=api_key)
 
     # Create the document chain
     doc_chain = create_stuff_documents_chain(llm, prompt)
